@@ -1,208 +1,68 @@
-<div align="center">
+# OpenCode BigFish 🐋
 
-# DSH BigFish 🐋
+A port of [QCYTSN/dsh-dafeiyu](https://github.com/QCYTSN/dsh-dafeiyu) from DeepSeek Harness to OpenCode. The native desktop companion follows real OpenCode session, tool, todo, permission, and question events. The interface is currently in Chinese.
 
-**A desktop companion for DeepSeek Harness.**
+[中文](README.md) · [Configuration and troubleshooting](docs/OPENCODE.md) · [Upstream DSH documentation](docs/DSH_EN.md)
 
-[中文](README.md) · [npm](https://www.npmjs.com/package/dsh-dafeiyu) · [Download latest](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest) · [Changelog](CHANGELOG.md)
+## Install from source
 
-[![npm](https://img.shields.io/npm/v/dsh-dafeiyu?label=npm)](https://www.npmjs.com/package/dsh-dafeiyu) [![Release](https://img.shields.io/github/v/release/QCYTSN/dsh-dafeiyu)](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)
+This adapter targets the OpenCode **1.2.27 plugin API**. Clone this repository into a permanent directory. On Windows / Linux, install Python 3.11+ and run:
 
-</div>
-
-BigFish starts and stops with its DSH Host. A transparent, frameless native window keeps the Agent's task status visible while you work in other apps.
-
-> **Current stable version: 0.1.23.** Fixes the Python fallback on Linux arm64 / architectures without a bundled Helper so it actually prints the PySide6 installation hint. It also includes the 0.1.22 approval chime and scene switches, the 0.1.21 cross-display drag and settings fallback, the 0.1.20 click-through fix, and the 0.1.19 Helper cold-start diagnostics. Install `dsh-dafeiyu@0.1.23`, or download **`dsh-dafeiyu-0.1.23.tgz`** from the [latest release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest). Windows, Linux, and macOS share this one package. GitHub's automatic **Source code (zip / tar.gz)** downloads are source archives, not installable packages.
-
-<img src="docs/images/balance-preview.png" width="460" alt="BigFish displays API balance below the current task">
-
-*Captured from the Windows native window with sample balance data. Current character assets come from [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet). The companion's interface is currently in Chinese.*
-
-## Features
-
-- Real session states: thinking, searching, editing, running, verifying, waiting, success, and errors.
-- Project and step information, multiple tasks, and progress supplied by DSH.
-- DeepSeek balances in the native status card and settings page, with separate API-key and signed-in account sources.
-- The shared Web client supports browser WebUI and official Desktop, each with its own plugin profile.
-- Dragging, head pats, body pokes, tail interaction, size controls, sounds, and reduced motion.
-- An optional lightweight companion inside the DSH page, disabled by default.
-
-BigFish observes DSH session events. It does not read your screen. Reasoning effort and progress are shown only when supplied by the Host.
-
-## Choose your client
-
-| Client | Plugin profile | Settings (DSH 0.2) | Native menu navigation |
-| --- | --- | --- | --- |
-| Browser WebUI | `web` | Sidebar Plugins → dsh-dafeiyu | WebUI; default `http://127.0.0.1:3080/` |
-| Official Desktop | `desktop` | Sidebar Plugins → dsh-dafeiyu | Focus the app through `dsh://open` |
-
-Installing into `web` does not install into `desktop`. Running both Hosts with BigFish enabled starts two native companions; disable it in one profile if needed. Community desktop wrappers may still use the `web` profile.
-
-The package's `platform: web` client declaration also applies to official Desktop, which embeds the same Web client. Each Host owns its native companion.
-
-## Install
-
-For command-line installation, updates, or removal, fully quit the target DSH Host first and restart it afterward. When using Desktop's in-app plugin manager, follow its restart prompts.
-
-### Browser WebUI
-
-With a global DSH CLI:
-
-```powershell
-dsh plugin --profile web add dsh-dafeiyu@0.1.23
-dsh web
+```sh
+python -m pip install -r requirements.txt
 ```
 
-With `npx`, without a global install:
+Windows uses `py` by default. If only `python` is available, set `DSH_DAFEIYU_PYTHON` to its full path before launching OpenCode. On macOS, build the native helper with `npm run build:helper:darwin`; `npm run build:helper` builds the helper for the current platform. This source checkout does not include prebuilt helpers.
 
-```powershell
-npx -y @deepseek-ai/dsh plugin --profile web add dsh-dafeiyu@0.1.23
-npx -y @deepseek-ai/dsh web
+Append the local entry to the existing `plugin` array in your project or global OpenCode configuration:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["file:///D:/project/dsh-dafeiyu-opencode/src/opencode.js"]
+}
 ```
 
-From a DeepSeek Harness source checkout, run in that checkout:
+Replace the absolute path with your checkout location. On Linux / macOS, use a URL such as `file:///home/me/dsh-dafeiyu-opencode/src/opencode.js`. Quit and restart OpenCode. The companion runs beside the local OpenCode server used by Desktop, Web, or the terminal. A remote server displays the pet on the server's desktop.
 
-```powershell
-pnpm dsh plugin --profile web add dsh-dafeiyu@0.1.23
-pnpm dsh web
+The OpenCode entry requires only built-in Node modules and local source. Run `npm install --ignore-scripts --no-package-lock` for development and the full regression suite.
+
+This port is loaded from local source. The upstream npm package `dsh-dafeiyu@0.1.23` contains the original DSH plugin. This checkout's root package export is now the OpenCode entry; the original DSH adapter remains available at `src/index.js` / `./dsh`.
+
+The repository's [opencode.json](opencode.json) already loads the local entry when you start OpenCode from this checkout. Built helpers under `runtime/bin/` are ignored by Git and must be prepared separately on another machine.
+
+## Features and settings
+
+BigFish displays thinking, tool activity, waiting for permission or answers, errors, completion, todo progress, and multiple sessions. Child sessions are optional. Dragging, interactions, animation, sound controls, reduced motion, and optional DeepSeek / Sub2API balance display reuse the native helper.
+
+Create `~/.config/opencode/dafeiyu.json` or `.opencode/dafeiyu.json`:
+
+```json
+{
+  "scale": 1,
+  "bubbleScale": 1,
+  "soundStates": ["SUCCESS", "ERROR", "APPROVAL"],
+  "includeSubagents": false,
+  "balanceEnabled": true
+}
 ```
 
-### Official Desktop
+Project values override global settings. Restart OpenCode after changing files. Size and reduced-motion changes from the native menu apply immediately and persist in separate OpenCode storage. See [configuration details](docs/OPENCODE.md) for all settings and logs.
 
-Install directly in the app:
+For a Sub2API relay, add `"balanceType": "sub2api"` and `"balanceProvider": "subapi2"` to the same file, replacing `subapi2` with your OpenCode provider ID. The plugin reads that provider's URL and API key, then queries `/v1/usage`. Wallet balance, remaining key quota, subscription allowance, and unlimited plans are labeled separately. `subapi2` is also accepted as a balance type alias. Restart OpenCode after changing settings.
 
-1. Open the official DeepSeek Harness Desktop app and select **Plugins** in the sidebar.
-2. Select **Add plugin**, enter `dsh-dafeiyu@0.1.23`, and select **Install**.
-3. After installation, select **Enable now**. BigFish appears on your desktop.
-4. Open **dsh-dafeiyu** in the plugin list to adjust the character, bubble, and balance settings. Changes apply live.
+## Development
 
-The app supplies its own installation environment; users need neither Node.js nor npm commands. Follow any refresh or restart prompt. If installation fails, expand **View installation details** and keep the log.
-
-Entering only `dsh-dafeiyu` selects the installation source's latest version. Immediately after a release, the default source may still return an older version; specifying the version avoids that mismatch. Check the installed version on its detail page.
-
-For command-line installation:
-
-1. Open Desktop once to initialize its profile, then fully quit it.
-2. Use the **CLI bundled with Desktop**. Versions offering command registration expose **Manage dsh command…** in the app menu. Alternatively invoke `resources/runtime/cli/bin/dsh` directly from the app installation (`dsh.cmd` on Windows).
-3. Run:
-
-   ```powershell
-   dsh plugin --profile desktop add dsh-dafeiyu@0.1.23
-   ```
-
-4. Reopen Desktop and select dsh-dafeiyu under sidebar Plugins.
-
-The `dsh` command above must belong to Desktop. A standalone npm or `npx @deepseek-ai/dsh` CLI cannot modify the official Desktop profile. See the [official Desktop documentation](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/desktop/README.md#bundled-command-runtime).
-
-### Release archive
-
-Open the [latest release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest), download **`dsh-dafeiyu-0.1.23.tgz`** under **Assets**, and install it with the appropriate client's CLI. Do not unpack it first. Historical versions and **Source code** archives are not the recommended installation:
-
-```powershell
-# WebUI; replace the path with your downloaded file
-npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.23.tgz"
-
-# Official Desktop; use its bundled CLI
-dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.23.tgz"
-```
-
-Desktop also accepts the full `.tgz` path in its **Add plugin** field.
-
-## Balance display
-
-Balance appears in the native status card footer and the settings page. The settings page shows total, granted, and topped-up amounts, plus manual refresh. Both clients share the Host's query and cache.
-
-| Source | Credentials | Query |
-| --- | --- | --- |
-| Auto, default | DSH's DeepSeek API key first; signed-in account if no key is configured | The selected source's balance |
-| API key | DSH credentials service; launch environment on older Hosts without that service | DeepSeek `/user/balance` |
-| Signed-in account | DSH's DeepSeek account service | Recharge and bonus wallets |
-
-Configure credentials in DSH's model or account settings; BigFish does not ask for another API key. API and account balances are labeled separately, as are CNY and USD. Queries run once per minute, share a cache within one Host, and limit manual refresh to once every five seconds.
-
-A failed refresh retains the last successful result and marks it as stale. Missing credentials, authorization failures, and service failures have distinct messages. Custom API gateways must implement the same balance endpoint. Keys, login credentials, and raw upstream errors never enter the balance UI or companion event stream. Task display works without balance credentials, and balance display can be disabled.
-
-Implementation references include [keshing/balance-display](https://github.com/keshing/balance-display) and DSH's public account service. Balance queries do not invoke a model.
-
-## Settings
-
-| Setting | Behavior |
-| --- | --- |
-| Enable BigFish | Toggle the native companion for this profile |
-| Character / bubble size | Independent sizing; small bubbles retain base font sizes |
-| Quiet / normal / lively | Rest for 45–90 / 25–45 / 12–22 seconds after each idle action |
-| Reduced motion | Hold the character pose, stop idle / touch animation, keep live status updates |
-| Sound | Master switch for all alerts (mutes audio only) |
-| Sound and notification scenes | Enable completion, tool-error and approval alerts independently. Unchecking a scene stops its chime and, on macOS, its notification banner; Windows and Linux play audio only |
-| Bubble mode | Always, hidden, or selected states |
-| Subagents | Include subagent activity in displayed states |
-| In-page companion | Show a lightweight character inside DSH |
-| Client target | Auto, WebUI, or official Desktop |
-| Balance / source | Enable queries and choose the source |
-
-Settings apply live. The native context menu offers size, motion, client navigation, and hide/close for the current run. Set `DSH_DAFEIYU_WEBUI_URL` when launching the Host to override the default navigation URL.
-
-## Platforms
-
-| Platform | Native companion |
-| --- | --- |
-| Windows 10 / 11 x64 | Bundled Helper; WSL2 uses Windows interoperability |
-| Linux x64 | Bundled Qt Helper; graphical desktop and glibc 2.35+ required; Ubuntu 24.04 has recorded acceptance results |
-| Linux arm64 | No architecture-matched Helper is bundled; falls back to the Python Helper and needs `python3` plus `PySide6>=6.7,<7`, or writes an explicit log entry |
-| macOS 12+ | Native Swift / AppKit Universal Helper; experimental |
-
-Release packages include the Helper. A normal installation needs neither Python nor a separately launched companion. Source development requires building the Helper. macOS font and partial-offscreen fixes pass CI; their appearance and multi-monitor behavior still need real-machine validation.
-
-The native window appears on the machine running the Host. A remote server or a Host without a graphical desktop cannot show a native window on your browser's machine. The optional in-page companion can appear in the browser.
-
-## Update and troubleshoot
-
-Desktop 0.2.0-rc.2 does not offer automatic plugin updates. Uninstall BigFish in the Plugins page, add `dsh-dafeiyu@0.1.23`, and enable it. Alternatively use Desktop's bundled CLI below.
-
-Quit the target Host, update, and restart:
-
-```powershell
-# WebUI
-npx -y @deepseek-ai/dsh plugin --profile web update dsh-dafeiyu
-
-# Official Desktop; its bundled CLI only
-dsh plugin --profile desktop update dsh-dafeiyu
-```
-
-Desktop's plugin manager is also supported. Rollback, removal, Windows `EPERM`, and restoring settings after a DSH migration are covered in [Updating and rollback](docs/UPDATING.md), currently in Chinese.
-
-- DSH 0.2 settings: install the current stable release and open sidebar Plugins → dsh-dafeiyu. Previous Hosts retain their older settings entry.
-- Installation reports only `[exit 1]`: include the detailed plugin-manager log, such as `hub.log`, DSH version, OS, and install method.
-- Balance unavailable: check DSH's credentials and gateway endpoint support.
-- Companion missing: check the profile, enable switch, and the Host's graphical desktop. Helper start failures now write a log:
-  - Windows: `%LOCALAPPDATA%\dsh-dafeiyu\logs\helper.log`
-  - macOS: `~/Library/Logs/dsh-dafeiyu/helper.log`
-  - Linux: `${XDG_STATE_HOME:-~/.local/state}/dsh-dafeiyu/helper.log`
-
-  The first launch extracts roughly 100 MB of Qt runtime into a temp directory, which a real-time antivirus scan can stretch well past a minute; the first readiness budget is now 180 s (later starts 60 s). Extraction temp lives in `%LOCALAPPDATA%\dsh-dafeiyu\tmp` on Windows and `~/.cache/dsh-dafeiyu/tmp` on Linux, where `_MEI*` leftovers older than a day are reclaimed on the next start. Set `DSH_DAFEIYU_LOG_FILE=<path>` to move the log, or `off` to disable it. The log contains local paths and start errors only, never credentials, and can be attached to a report.
-
-The [issue / PR triage](https://github.com/QCYTSN/dsh-dafeiyu/blob/main/docs/GITHUB_TRIAGE.md) separates implemented fixes from reports needing more evidence. [Acceptance records](https://github.com/QCYTSN/dsh-dafeiyu/blob/main/docs/ACCEPTANCE.md) contain historical validation. Older version numbers in these records are for traceability, not installation recommendations.
-
-## Develop from source
-
-```powershell
-pnpm install --frozen-lockfile
+```sh
+npm install --ignore-scripts --no-package-lock
+node --test test/opencode-events.test.js test/opencode-plugin.test.js
 npm test
 npm run test:python
-npm run build:helper
-npm run test:helper:packaged
+npm run test:opencode
 ```
 
-Python development uses `requirements.txt`; macOS needs Xcode Command Line Tools. Run `swift test` for the pure Swift core. Rebuild after native changes and install a local package archive to exercise the complete plugin.
+Rebuild packaged helpers after changing Python / Swift. Run `swift test` for macOS core tests.
 
-CI also installs DSH 0.2.0-rc.2 in isolation and runs `scripts/test-dsh-settings.mjs` against its settings API. This check uses a test storage adapter and never reads user profiles or credentials.
+`test:opencode` requires an installed OpenCode executable. It uses isolated temporary configuration, a local mock model and Sub2API endpoint to verify real tools, todos, completion, balance display, and helper shutdown. Set `OPENCODE_BIN` to override the executable path.
 
-GitHub Actions builds platform Helpers and publishes releases. See [Releasing](https://github.com/QCYTSN/dsh-dafeiyu/blob/main/docs/RELEASING.md).
-
-## Assets and licensing
-
-Current animations come from [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet), converted to transparent WebP frames at their native **24 fps**. The manifest contains 16 clips and 3,444 frames on a 412 × 344 canvas, with the upstream revision, video checksums and frame windows recorded. See the [animation behavior reference](docs/animation-behavior.md) for triggers and handoffs.
-
-Code and character assets have different licenses. Read [ASSET_LICENSE.md](ASSET_LICENSE.md), the [source asset license](assets/dsh-pet-LICENSE.txt), and [LICENSE](LICENSE). Earlier assets and community dragging images remain archived under `legacy/` and are excluded from the current npm package.
-
-Thanks to community contributors for animation, macOS, WSL, and compatibility improvements. Subscribe through **Watch → Custom → Releases** for updates; starring only bookmarks the project.
+Code and character assets have separate licenses. Read [LICENSE](LICENSE), [ASSET_LICENSE.md](ASSET_LICENSE.md), and the [asset license](assets/dsh-pet-LICENSE.txt).

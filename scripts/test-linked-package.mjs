@@ -16,7 +16,9 @@ try {
   await mkdir(nodeModules, { recursive: true })
   await symlink(packageDirectory, link, process.platform === 'win32' ? 'junction' : 'dir')
   await writeFile(entry, [
-    "import { Config } from 'dsh-dafeiyu'",
+    "import BigFish from 'dsh-dafeiyu'",
+    "if (typeof BigFish !== 'function') throw new Error('OpenCode plugin did not load')",
+    "import { Config } from 'dsh-dafeiyu/dsh'",
     "if (!Config || !['function', 'object'].includes(typeof Config)) throw new Error('plugin Config did not load')",
     "process.stdout.write('linked package import passed\\n')",
   ].join('\n'))

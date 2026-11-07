@@ -8,7 +8,7 @@ const errors = {
   INVALID_RESPONSE: '余额服务返回了无法识别的数据。',
 }
 
-function balanceError(code) {
+export function balanceError(code) {
   return Object.assign(new Error(errors[code]), { code })
 }
 
@@ -76,7 +76,7 @@ function serviceOf(ctx, name) {
   try { return ctx.get?.(name) ?? ctx[name] } catch { return undefined }
 }
 
-async function responseText(response) {
+async function responseText(response, maxBytes) {
   if (!response.body?.getReader) return response.text()
   const reader = response.body.getReader()
   const chunks = []
@@ -86,7 +86,7 @@ async function responseText(response) {
       const { done, value } = await reader.read()
       if (done) break
       bytes += value.byteLength
-      if (bytes > 32768) {
+      if (bytes > maxBytes) {
         await reader.cancel().catch(() => {})
         throw balanceError('INVALID_RESPONSE')
       }
@@ -95,6 +95,22 @@ async function responseText(response) {
     return Buffer.concat(chunks).toString('utf8')
   } finally { reader.releaseLock() }
 }
+
+export async function fetchBalanceJson(url, { apiKey, signal, fetchImpl = fetch, maxBytes = 32768, allowHttp = false }) {
+  if (url.username || url.password || (url.protocol !== 'https:'
+    && !(url.protocol === 'http:' && (allowHttp || ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))))) {
+    throw balanceError('UNAVAILABLE')
+  }
+  const response = await fetchImpl(url, {
+    headers: { Authorization: `Bearer ${apiKey}` }, signal, redirect: 'error',
+  })
+  if (!response.ok) throw balanceError([401, 403].includes(response.status) ? 'AUTH' : 'UNAVAILABLE')
+  const text = await responseText(response, maxBytes)
+  if (Buffer.byteLength(text, 'utf8') > maxBytes) throw balanceError('INVALID_RESPONSE')
+  try { return JSON.parse(text) } catch { throw balanceError('INVALID_RESPONSE') }
+}
+
+export { amount as balanceAmount }
 
 export function balanceProviderNamespace(ctx) {
   return serviceOf(ctx, 'llm')?.listConfigurableProviders?.()
@@ -116,22 +132,10 @@ export function createBalanceQuery(ctx, { fetchImpl = fetch, environment = proce
       : { value: envValue(ref) }
     if (typeof credential?.value === 'string' && credential.value.trim()) {
       const url = new URL(provider.baseURL ?? envValue('DEEPSEEK_BASE_URL') ?? 'https://api.deepseek.com')
-      if (url.username || url.password || (url.protocol !== 'https:'
-        && !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)))) {
-        throw balanceError('UNAVAILABLE')
-      }
       url.pathname = url.pathname.replace(/\/(?:v1|anthropic)\/?$/, '').replace(/\/$/, '') + '/user/balance'
       url.search = ''
       url.hash = ''
-      const response = await fetchImpl(url, {
-        headers: { Authorization: `Bearer ${credential.value}` },
-        signal, redirect: 'error',
-      })
-      if (!response.ok) throw balanceError([401, 403].includes(response.status) ? 'AUTH' : 'UNAVAILABLE')
-      const text = await responseText(response)
-      if (text.length > 32768) throw balanceError('INVALID_RESPONSE')
-      let body
-      try { body = JSON.parse(text) } catch { throw balanceError('INVALID_RESPONSE') }
+      const body = await fetchBalanceJson(url, { apiKey: credential.value, signal, fetchImpl })
       return { ...parseApiBalance(body), source: 'api-key' }
     }
     const account = serviceOf(ctx, 'deepseekAccount')
@@ -156,11 +160,18 @@ export function createBalanceQuery(ctx, { fetchImpl = fetch, environment = proce
 export function balanceSummary(snapshot) {
   if (snapshot.status === 'disabled') return ''
   if (snapshot.status === 'loading') return '正在查询余额…'
+  const suffix = snapshot.status === 'error' ? '（上次查询）' : ''
+  const availability = snapshot.available === false ? '（不可用）' : ''
+  if (snapshot.source === 'sub2api' && snapshot.unlimited) return `Sub2API 套餐不限额${availability}${suffix}`
   if (!snapshot.balances.length) return snapshot.status === 'not-configured' ? '余额未配置' : '余额暂不可用'
   const amounts = snapshot.balances.map((row) => new Intl.NumberFormat('zh-CN', {
     style: 'currency', currency: row.currency, minimumFractionDigits: 2, maximumFractionDigits: 4,
   }).format(row.total)).join(' · ')
-  return `${snapshot.source === 'account' ? '账户' : 'API'} 余额 ${amounts}${snapshot.status === 'error' ? '（上次查询）' : ''}`
+  if (snapshot.source === 'sub2api') {
+    const label = { wallet: '账户余额', 'key-quota': 'Key 可用额度', subscription: '套餐剩余额度' }[snapshot.balanceKind] ?? '剩余额度'
+    return `Sub2API ${label} ${amounts}${availability}${suffix}`
+  }
+  return `${snapshot.source === 'account' ? '账户' : 'API'} 余额 ${amounts}${suffix}`
 }
 
 export function createBalanceMonitor({ query, onChange = () => {}, now = Date.now, intervalMs = 60000, timeoutMs = 10000 }) {
@@ -203,7 +214,7 @@ export function createBalanceMonitor({ query, onChange = () => {}, now = Date.no
         if (started === generation && !stopped) {
           const code = Object.hasOwn(errors, error?.code) ? error.code : 'UNAVAILABLE'
           const retained = ['NOT_CONFIGURED', 'AUTH'].includes(code)
-            ? { balances: [], checkedAt: null, available: null, source: null } : {}
+            ? { balances: [], checkedAt: null, available: null, source: null, unlimited: undefined, balanceKind: undefined } : {}
           publish({ ...snapshot, ...retained, status: code === 'NOT_CONFIGURED' ? 'not-configured' : 'error', error: errors[code] })
         }
       } finally {

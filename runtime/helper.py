@@ -379,7 +379,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.display_state = "IDLE"
             self.status_state = "IDLE"
             self.status_message = "我在这儿等新任务哦"
-            self.status_detail = "DSH · 等待下一次任务"
+            self.host_name = os.environ.get("DSH_DAFEIYU_HOST_NAME", "DSH")
+            self.status_detail = f"{self.host_name} · 等待下一次任务"
             self.status_deadline_ms: int | None = self._now_ms() + 4200
             # Glove cursor: native .cur handles (loaded at natural size).
             self.glove_open_h = load_native_cursor(asset_root.parent / "cursor_grab.cur")
@@ -413,7 +414,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             if not self.reduced_motion:
                 self._schedule_micro()
             self.snapshot_saved = False
-            self.setWindowTitle("DSH 大肥鱼")
+            self.setWindowTitle(f"{self.host_name} 大肥鱼")
             self.setWindowFlags(
                 Qt.WindowType.FramelessWindowHint
                 | Qt.WindowType.WindowStaysOnTopHint
@@ -851,7 +852,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             ):
                 return self.status_message, self.status_detail, self.status_state
             if self.balance_summary:
-                return "大肥鱼陪你待命", "DSH · 等待下一次任务", "IDLE"
+                return "大肥鱼陪你待命", f"{self.host_name} · 等待下一次任务", "IDLE"
             return None
 
         @staticmethod
@@ -1220,8 +1221,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
 
         def _open_client(self) -> None:
             if not QDesktopServices.openUrl(QUrl(self.webui_url)):
-                print("Unable to open the configured DSH client", file=sys.stderr)
-                self._show_overlay("无法打开 DSH", "请确认 DSH 已安装、打开地址设置正确", "ERROR", 4000)
+                print(f"Unable to open the configured {self.host_name} client", file=sys.stderr)
+                self._show_overlay(f"无法打开 {self.host_name}", f"请确认 {self.host_name} 已安装、打开地址设置正确", "ERROR", 4000)
                 self._sync_bubble_size()
                 self.update()
 

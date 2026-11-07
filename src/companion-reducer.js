@@ -158,14 +158,15 @@ function detailFor(record, stage = record.payload.stage) {
   if (record.progress?.total) parts.push(`已完成 ${record.progress.completed}/${record.progress.total} 步`)
   if (record.task) parts.push(record.task)
   else if (stage) parts.push(stage)
-  return parts.join(' · ') || stage || 'DSH 任务'
+  return parts.join(' · ') || stage || `${record.hostName ?? 'DSH'} 任务`
 }
 
 export class CompanionReducer {
-  constructor({ includeSubagents = false, maxSessions = 256 } = {}) {
+  constructor({ includeSubagents = false, maxSessions = 256, hostName = 'DSH' } = {}) {
     this.includeSubagents = includeSubagents
     this.sessions = new Map()
     this.maxSessions = maxSessions
+    this.hostName = hostName
     this.clock = 0
     this.outputSignature = undefined
     this.tasksSignature = undefined
@@ -241,6 +242,9 @@ export class CompanionReducer {
             toolName: name,
             message: statusCopy('waiting', event.seq),
           })
+          return this.#render()
+        }
+        if (record.waitingApprovalId || (record.waitingCallId && record.openTools.has(record.waitingCallId))) {
           return this.#render()
         }
         const activity = toolActivity(name)
@@ -327,6 +331,7 @@ export class CompanionReducer {
   }
 
   #resumeAfterTool(record, event) {
+    if (record.waitingApprovalId) return this.#render()
     if (record.waitingCallId && record.openTools.has(record.waitingCallId)) {
       return this.#render()
     }
@@ -458,7 +463,8 @@ export class CompanionReducer {
     record = {
       id: sessionId,
       state: CompanionState.IDLE,
-      payload: { phase: 'session-created', message: 'DSH 空闲中' },
+      payload: { phase: 'session-created', message: `${this.hostName} 空闲中` },
+      hostName: this.hostName,
       turnActive: false,
       openTools: new Map(),
       waitingCallId: undefined,
@@ -502,7 +508,8 @@ export class CompanionReducer {
         record: {
           id: 'dsh-host',
           state: CompanionState.IDLE,
-          payload: { phase: 'no-session', message: 'DSH 空闲中' },
+          payload: { phase: 'no-session', message: `${this.hostName} 空闲中` },
+          hostName: this.hostName,
           updatedAt: ++this.clock,
         },
       }
