@@ -3,12 +3,14 @@ import { CompanionReducer } from './companion-reducer.js'
 // Translate OpenCode's public bus into the existing companion state machine.
 // A model step can finish with tool calls; only session idle ends the turn.
 export class OpenCodeEvents {
-  constructor({ directory, includeSubagents = false, maxSessions = 256 } = {}) {
+  constructor({ directory, includeSubagents = false, maxSessions = 256, onEvent, onDispose } = {}) {
     this.directory = directory
     this.maxSessions = maxSessions
     this.sessions = new Map()
     this.reducer = new CompanionReducer({ includeSubagents, maxSessions, hostName: 'OpenCode' })
     this.sequence = 0
+    this.onEvent = onEvent
+    this.onDispose = onDispose
   }
 
   sessionID(event) {
@@ -28,6 +30,12 @@ export class OpenCodeEvents {
       cwd: info.directory ?? this.directory,
       header: { origin: info.parentID ? 'subagent' : 'user' },
     }
+  }
+
+  snapshot() {
+    return [...this.reducer.sessions.values()].map((record) => ({
+      ...record, openTools: [...record.openTools],
+    }))
   }
 
   #session(id) {
@@ -55,13 +63,18 @@ export class OpenCodeEvents {
     if (!id) return []
     if (event.type === 'session.deleted') {
       this.sessions.delete(id)
+      this.onDispose?.(id)
       return this.reducer.disposeSession({ id })
     }
     const record = this.#session(id)
     const messages = []
-    const emit = (type, data = {}) => messages.push(...this.reducer.handle(record.session, {
-      type, data, seq: ++this.sequence,
-    }))
+    const emit = (type, data = {}) => {
+      const normalized = { type, data, seq: ++this.sequence }
+      messages.push(...this.reducer.handle(record.session, normalized))
+      if (this.reducer.includeSubagents || record.session.header?.origin !== 'subagent') {
+        this.onEvent?.(record.session, normalized)
+      }
+    }
     const begin = () => {
       if (record.active) return
       record.active = true

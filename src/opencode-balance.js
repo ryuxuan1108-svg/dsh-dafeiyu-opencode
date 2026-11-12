@@ -37,6 +37,13 @@ export function parseSub2ApiUsage(body) {
   const active = body.isValid && (!body.status || body.status === 'active')
   let balanceKind
   let total
+  const percentages = []
+  const recordUsage = (limit, used) => {
+    if (limit == null || used == null) return
+    const cap = Number(amount(limit))
+    const consumed = Number(nonnegative(used))
+    if (cap > 0) percentages.push(Math.min(100, Math.max(0, consumed / cap * 100)))
+  }
   let unit = body.unit === undefined ? undefined : currency(body.unit)
   if (body.mode === 'quota_limited') {
     balanceKind = 'key-quota'
@@ -44,6 +51,7 @@ export function parseSub2ApiUsage(body) {
     if (body.quota) {
       unit = currency(body.quota.unit ?? body.unit)
       remaining.push(nonnegative(body.quota.remaining))
+      recordUsage(body.quota.limit, body.quota.used)
     } else if (body.remaining !== undefined) {
       unit = currency(body.unit)
       remaining.push(nonnegative(body.remaining))
@@ -53,6 +61,7 @@ export function parseSub2ApiUsage(body) {
       for (const window of body.rate_limits) {
         if (!['5h', '1d', '7d'].includes(window?.window)) throw balanceError('INVALID_RESPONSE')
         remaining.push(nonnegative(window.remaining))
+        recordUsage(window.limit, window.used)
       }
       // Sub2API rate-limit windows are denominated in USD.
       if (body.rate_limits.length && unit && unit !== 'USD') throw balanceError('INVALID_RESPONSE')
@@ -72,12 +81,16 @@ export function parseSub2ApiUsage(body) {
       return { source: 'sub2api', balanceKind, unlimited: true, available: active, balances: [] }
     }
     if (Number(total) < 0) throw balanceError('INVALID_RESPONSE')
+    for (const window of ['daily', 'weekly', 'monthly']) {
+      recordUsage(body.subscription[`${window}_limit_usd`], body.subscription[`${window}_usage_usd`])
+    }
   } else {
     throw balanceError('INVALID_RESPONSE')
   }
   return {
     source: 'sub2api', balanceKind, available: active && Number(total) > 0,
     balances: [{ currency: unit, total }],
+    ...(percentages.length ? { usedPercent: Math.max(...percentages) } : {}),
   }
 }
 

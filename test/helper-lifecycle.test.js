@@ -138,3 +138,28 @@ test('desktop context-menu settings reach the host settings callback', async () 
   bridge.stop('settings-test-complete')
   await exited
 })
+
+test('shutdown drains backpressure before closing Helper input', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-shutdown-drain-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const log = join(directory, 'input.log')
+  const bridge = new HelperProcess({
+    command: process.execPath,
+    args: [fileURLToPath(new URL('./fixtures/slow-input-helper.js', import.meta.url))],
+    env: { BIGFISH_INPUT_LOG: log }, heartbeatMs: 0,
+  }, { debug() {}, info() {}, warn() {}, error() {} })
+  t.after(() => bridge.stop('test-cleanup'))
+  const child = bridge.start()
+  const exited = new Promise((resolve, reject) => {
+    child.once('exit', (code) => code === 0 ? resolve() : reject(new Error(`Helper exited with ${code}`)))
+    child.once('error', reject)
+  })
+  await waitFor(() => bridge.spawned)
+  for (let index = 0; index < 100 && !bridge.writeBlocked; index += 1) {
+    bridge.send(createMessage('state', { state: 'WORKING', detail: 'x'.repeat(128 * 1024) }))
+  }
+  assert.equal(bridge.writeBlocked, true)
+  bridge.stop('backpressure-drain')
+  await exited
+  assert.equal((await readFile(log, 'utf8')).trim().split(/\r?\n/).at(-1), 'shutdown')
+})

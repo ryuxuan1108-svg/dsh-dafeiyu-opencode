@@ -614,7 +614,7 @@ export class HelperProcess {
     )
     if (this.spawned) {
       this.#flushQueue()
-      this.#endInput(child)
+      this.#finishShutdown(child)
     }
     const timer = setTimeout(() => {
       if (this.child === child) child.kill()
@@ -670,6 +670,7 @@ export class HelperProcess {
       this.writeBlocked = false
       this.queueDropWarned = false
       this.#flushQueue()
+      this.#finishShutdown(child)
     })
   }
 
@@ -692,7 +693,7 @@ export class HelperProcess {
           this.#flushQueue()
         }
         this.#startHeartbeat()
-        if (this.stopping) this.#endInput(this.child)
+        if (this.stopping) this.#finishShutdown(this.child)
         return
       }
       if (reply?.protocolVersion === 1 && reply.kind === CompanionMessageKind.PONG) {
@@ -795,6 +796,10 @@ export class HelperProcess {
 
   #endInput(child) {
     if (child.stdin.writable && !child.stdin.destroyed) child.stdin.end()
+  }
+
+  #finishShutdown(child) {
+    if (this.stopping && !this.writeBlocked && this.queue.length === 0) this.#endInput(child)
   }
 }
 

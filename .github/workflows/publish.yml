@@ -178,8 +178,8 @@ jobs:
           node-version: "24"
           package-manager-cache: false
 
-      - name: Install bundled runtime dependencies
-        run: npm install --ignore-scripts --no-package-lock --omit=dev
+      - name: Install runtime and engine build dependencies
+        run: npm install --legacy-peer-deps --ignore-scripts --no-package-lock
 
       - name: Install Linux display libraries
         run: |

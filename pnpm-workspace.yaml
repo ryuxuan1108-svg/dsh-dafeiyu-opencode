@@ -1,3 +1,9 @@
 minimumReleaseAgeExclude:
   - '@deepseek-ai/cosmokit@1.8.2'
   - '@deepseek-ai/schemastery@3.18.1'
+autoInstallPeers: false
+peerDependencyRules:
+  ignoreMissing:
+    - '@deepseek-ai/*'
+    - react
+    - react-dom

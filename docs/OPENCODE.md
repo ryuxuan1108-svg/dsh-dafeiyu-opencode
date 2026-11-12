@@ -2,6 +2,53 @@
 
 本移植以 OpenCode 1.2.27 的公开插件接口为基准，入口为 `src/opencode.js`，只导出一个插件函数。包根路径和 `./opencode` 指向此入口；`./dsh` 保留上游入口。安装方法见 [README](../README.md)。
 
+## 以 dsh-pet 为主体
+
+默认 `petEngine: "dsh-pet"` 直接使用 [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet) **0.4.7** 的宿主逻辑、Electron 窗口、动画和设置页。`npm run build:pet` 将上游宿主源码与 OpenCode 适配器构建成 `dist/dsh-pet-engine.js`；安装依赖时使用 `npm install --legacy-peer-deps --ignore-scripts --no-package-lock`。已有仓库更新后需要重新安装依赖、构建，并重启 OpenCode。
+
+默认模式不需要 Python。上游在首次启动时自动准备 Electron，缓存在全局配置目录的 `pet-runtime/electron/`。旧的 Qt / Swift 桌宠可通过 `"petEngine": "native"` 使用，对应平台仍需原来的 Python 或原生 Helper。
+
+右键桌宠的「打开 AI 设置」进入上游聊天 / 配置界面，可调整外观、物理、动画、人设、语音和待办。模型和 API Key 统一读取 OpenCode，界面不再要求重复填写服务商密钥。主界面资源、菜单、拖拽甩抛、动作点播、睡觉和提醒逻辑沿用上游。
+
+数据默认保存在 `~/.config/opencode/pet-runtime/dsh-pet/`，支持 `OPENCODE_CONFIG_DIR` / `XDG_CONFIG_HOME`：
+
+| 路径 | 内容 |
+| --- | --- |
+| `main-config.jsonc` | 上游桌宠配置，保存后即时生效 |
+| `memory.json` | 聊天历史与记忆 |
+| `todos.json` | 个人待办和到期时间，与 OpenCode Agent 的任务清单分别保存 |
+| `attachments/` | 内容哈希去重的聊天图片 |
+| `pet/` | 上游格式的角色包 |
+| `logs.txt` | 上游引擎运行日志 |
+| `opencode-runtime.json` | 当前设置页地址与端口，仅运行时存在，包含本机访问凭据 |
+
+`petId` 默认 `main`。角色包和实例沿用上游格式，配置中有多只时仅显示选中的一只，找不到该 ID 时选择第一只。所有工作区共用同一个引擎和这份用户数据；Electron 的浏览器缓存也与 DSH 安装隔离。
+
+聊天和手动碎碎念通过当前工作区的 OpenCode 模型执行，尚未观察到模型选择时回落到 `small_model` / 默认模型。每次使用禁止全部工具的临时会话，模型不会借聊天执行项目工具；结束后删除临时会话，历史由上游保存。聊天图片上限 650KB / 2,000 万像素，是否能看图取决于所选模型。
+
+自动碎碎念和语音朗读默认关闭，可以在图形设置中开启。朗读沿用上游在线 Edge TTS，需要可用网络。OpenCode 当前没有提供 DSH 的语音识别服务，麦克风输入会显示上游的“不支持”提示；不会伪装转写成功。移动端重力传感器和 DSH 页面内浮层属于上游浏览器环境，当前默认接入为桌面模式。
+
+## 工作区与全局加载
+
+跨工作区使用时，在**全局** `~/.config/opencode/opencode.json` 注册插件。Windows 默认位置为 `C:\Users\你的用户名\.config\opencode\opencode.json`。向现有配置合并以下字段，路径替换为实际仓库位置：
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["file:///D:/project/dsh-dafeiyu-opencode/src/opencode.js"]
+}
+```
+
+项目中的 `opencode.json` 只在该项目生效。全局 `dafeiyu.json` 是桌宠设置文件，不会注册插件；因此只设置全局余额仍可能出现“换工作区没有反应”。配置全局入口后，其他工作区即可加载同一份插件和全局余额设置。仓库位置需保持有效，移动仓库后同步更新入口地址。
+
+OpenCode 仍按工作区加载插件，但同一个全局配置目录下的工作区和本机 OpenCode 进程现在**共用一只大肥鱼**。各工作区通过本机管道连接到同一个 Helper，统一汇总任务；等待确认和错误优先，其次显示进行中的任务，同优先级显示最近更新的任务。不同工作区即使出现同名会话也会分别处理。
+
+关闭一个工作区只移除它的任务；最后一个工作区断开时关闭共享 Helper。若持有 Helper 的 OpenCode 进程意外退出，其余进程会重新连接并恢复当前任务状态，恢复过程不会重复播放旧的完成提示音或审批提醒。
+
+模型与余额跟随当前显示任务对应的工作区；上游引擎统一调度余额刷新。上游外观与人设使用共享用户配置。可以在某个项目的 `.opencode/dafeiyu.json` 设置 `"enabled": false`，让该工作区不参与桌宠状态显示。
+
+如果全局和项目都注册同一入口，请使用指向同一个源文件的地址；OpenCode 1.2.27 会去重。修改全局或项目配置后，**完全退出并重新启动 OpenCode**，以便已经打开的工作区重新加载。
+
 ## 事件映射
 
 | OpenCode 事件 | 大肥鱼行为 |
@@ -15,7 +62,7 @@
 | `session.status` idle / `session.idle` | 本轮完成，只提示一次 |
 | `session.error` | 错误；用户中断则显示已停止 |
 | `session.deleted` | 移除该会话并选择其他任务 |
-| `server.instance.disposed` / `global.disposed` | 停止原生 Helper |
+| `server.instance.disposed` / `global.disposed` | 断开该工作区；最后一个工作区断开后停止共享 Helper |
 
 模型的 `step-finish` 可能表示即将执行工具，因此不作为任务完成信号。适配器按顺序处理事件；通过 SDK 获取会话目录和 `parentID`，默认排除子会话。提示不会包含工具参数、工具输出、模型原文或上游原始错误。
 
@@ -28,6 +75,8 @@
 | 选项 | 默认值 | 说明 |
 | --- | --- | --- |
 | `enabled` | `true` | 是否启动桌宠 |
+| `petEngine` | `"dsh-pet"` | 上游引擎；`native` 为原有 Qt / Swift 兼容模式 |
+| `petId` | `"main"` | 选中的上游宠物 ID，始终只显示一只 |
 | `scale` | `1` | 角色大小，0.55–1.4 |
 | `bubbleScale` | `1` | 气泡大小，0.8–1.2 |
 | `activityLevel` | `"normal"` | `quiet`、`normal`、`lively` |
@@ -53,9 +102,9 @@
 }
 ```
 
-修改设置文件后完全退出并重新启动 OpenCode。右键菜单的角色大小、气泡大小和减少动态立即生效，保存到全局目录的 `dafeiyu-user-settings.json`，供 Helper 重启和下次 OpenCode 启动恢复；配置文件中随后更改的值优先。窗口位置和 Helper 日志沿用原生实现。
+修改 OpenCode 接入设置后完全退出并重新启动 OpenCode。上表的 `scale` 等原生外观选项用于 `native` 模式；上游模式的外观、动作、气泡和语音在上游设置页调整，第一次建立配置时迁移角色大小和余额开关。`dafeiyu-user-settings.json` 保留原生模式的菜单设置。
 
-OpenCode 1.2.27 的标准插件接口提供事件和工具钩子。本次通过原生桌宠右键菜单和 JSON 提供设置；DSH 的 React 设置页与页面内角色仍属于上游客户端实现。
+OpenCode 1.2.27 的标准插件接口提供事件和工具钩子。默认模式提供上游独立设置页和桌宠聊天界面；DSH 客户端内部的侧栏注入仍只属于 DSH。
 
 ## DeepSeek 余额
 
@@ -95,6 +144,8 @@ Key 优先读取该服务商的 `options.apiKey`，其次 `SUB2API_API_KEY`，�
 | 套餐未设置额度上限 | `Sub2API 套餐不限额` |
 
 Key 限额和套餐额度按上游返回显示，与钱包余额分别标记；没有返回数字时不会显示成零。查询失败保留上次成功结果并标明“上次查询”；凭据失效则清除旧结果。插件只向桌宠传递整理后的余额数据，不传递 Key、原始用量明细或套餐名称。
+
+默认上游引擎的余额刷新和失败气泡沿用 dsh-pet 的处理；上述“上次查询”缓存标记适用于 native 模式。接口提供额度上限与已用量时会按实际百分比驱动上游余额档位动画，只有钱包余额时不猜测“已用百分比”。
 
 默认 `balanceType: "auto"` 会优先识别服务商 ID / 名称中的 `sub2api`、`subapi2`，优先选择当前模型对应的匹配服务商，随后查找其他匹配服务商，未匹配时使用 DeepSeek。自定义名称建议显式设置 `balanceType` 和 `balanceProvider`。指定 `sub2api` 而省略服务商 ID 时，会尝试匹配的服务商或配置中的当前模型服务商。
 

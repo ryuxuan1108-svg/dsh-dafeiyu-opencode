@@ -7,6 +7,15 @@ import * as entry from '../src/opencode.js'
 import { HelperProcess } from '../src/helper-process.js'
 import { loadSettings, normalizeSettings, resolveOpenUrl, settingsPaths } from '../src/opencode-settings.js'
 
+async function waitFor(predicate) {
+  const deadline = Date.now() + 3000
+  while (Date.now() < deadline) {
+    if (predicate()) return
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+  throw new Error('timed out waiting for shared companion')
+}
+
 test('OpenCode module exposes a single plugin function and no DSH runtime exports', () => {
   assert.deepEqual(Object.keys(entry), ['default'])
   assert.equal(typeof entry.default, 'function')
@@ -21,7 +30,7 @@ test('plugin loads settings, serializes events, persists native settings, and di
     else process.env.OPENCODE_CONFIG_DIR = previous
     await rm(directory, { recursive: true, force: true })
   })
-  await writeFile(join(directory, 'dafeiyu.json'), JSON.stringify({ scale: 0.8, balanceEnabled: false }))
+  await writeFile(join(directory, 'dafeiyu.json'), JSON.stringify({ scale: 0.8, balanceEnabled: false, petEngine: 'native' }))
   let bridge
   const delivered = []
   let stopped
@@ -45,12 +54,14 @@ test('plugin loads settings, serializes events, persists native settings, and di
   await Promise.all(['busy', 'idle'].map((type) => hooks.event({
     event: { type: 'session.status', properties: { sessionID: 'one', status: { type } } },
   })))
+  await waitFor(() => delivered.some((message) => message.state === 'SUCCESS'))
   assert.ok(delivered.some((message) => message.state === 'THINKING'))
   assert.equal(delivered.filter((message) => message.state === 'SUCCESS').length, 1)
   const count = delivered.length
   await hooks.event({ event: { type: 'session.status', properties: { sessionID: 'child', status: { type: 'busy' } } } })
   assert.equal(delivered.length, count)
   bridge.options.onSettingsChange({ scale: 1.2, reducedMotion: true })
+  await waitFor(() => bridge.options.env.DSH_DAFEIYU_SCALE === '1.2')
   assert.equal(bridge.options.env.DSH_DAFEIYU_SCALE, '1.2')
   const saved = JSON.parse(await readFile(join(directory, 'dafeiyu-user-settings.json'), 'utf8'))
   assert.equal(saved.overrides.scale.value, 1.2)
@@ -95,7 +106,7 @@ test('OpenCode saved provider credentials query API balance without exposing the
   })
   const hooks = await entry.default({ directory, client: {
     config: { async providers() { return { data: { providers: [{ id: 'deepseek', key: 'smoke-provider-key' }] } } } },
-  } })
+  } }, { petEngine: 'native' })
   t.after(() => hooks.event({ event: { type: 'global.disposed' } }))
   await hooks.config({ provider: { deepseek: { options: { baseURL: 'http://127.0.0.1:4567/v1' } } } })
   const deadline = Date.now() + 1000
@@ -120,6 +131,7 @@ test('settings have separate OpenCode storage, clamp ranges and reject invalid v
     bubbleMode: 'always', bubbleStates: ['SUCCESS', 'ERROR', 'WAITING'],
     includeSubagents: false, balanceEnabled: true, openUrl: '',
     balanceType: 'auto', balanceProvider: '',
+    petEngine: 'dsh-pet', petId: 'main',
   })
 })
 

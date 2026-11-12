@@ -1,13 +1,23 @@
 # Visual asset notice
 
-The source code in this repository is MIT-licensed. The visual character
-assets currently bundled under `assets/pet/` are MIT-licensed as well and
-originate from the [dsh-pet](https://github.com/PC2005-cloud/dsh-pet) project;
-see the "Whale-tail maid character assets" section below. The previous BigFish
-frames remain archived under `legacy/dafeiyu/` under their original
-restricted terms; see the "Legacy BigFish frames" section.
+The source code in this repository is MIT-licensed. The default desktop engine
+is [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet), pinned to npm
+version 0.4.7. Its code license is retained in `vendor/dsh-pet-LICENSE.txt`.
 
-## Whale-tail maid character assets (current, MIT)
+Current upstream artwork is subject to the attribution, noncommercial and
+share-alike notice in the [upstream README](https://github.com/PC2005-cloud/dsh-pet#许可):
+[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+The character is a community derivative of DeepSeek's “BigFish”, not an official
+DeepSeek character. The original character “溟月” is attributed to
+[@上善无形](https://space.bilibili.com/4456176), and the maid/whale design to
+[@ZipZipPipe](https://space.bilibili.com/4168597). Derivatives must credit
+<https://github.com/PC2005-cloud/dsh-pet> in public project/product materials.
+
+The following sections preserve the provenance and license notices for the
+older Qt/Swift frame sets kept for native compatibility. They do not replace
+the current upstream artwork notice above.
+
+## Historical whale-tail maid frame import (native compatibility)
 
 The runtime frames under `assets/pet/` are converted from the animation set of
 [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)

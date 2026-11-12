@@ -32,6 +32,7 @@ test('Sub2API quota displays the smallest remaining key or time-window allowance
     rate_limits: [{ window: '5h', remaining: '1.000000000000000001' }, { window: '1d', remaining: '1.000000000000000000' }],
   })
   assert.equal(result.balanceKind, 'key-quota')
+  assert.equal(result.usedPercent, 50)
   assert.equal(result.balances[0].total, '1.000000000000000000')
   assert.match(balanceSummary(snapshot(result)), /Key 可用额度/)
   const windows = parseSub2ApiUsage({ mode: 'quota_limited', isValid: true,
@@ -42,6 +43,7 @@ test('Sub2API quota displays the smallest remaining key or time-window allowance
 })
 
 test('Sub2API subscriptions distinguish limited, unlimited and expired plans', () => {
+  assert.equal(parseSub2ApiUsage(subscription).usedPercent, 17.5)
   assert.match(balanceSummary(snapshot(parseSub2ApiUsage(subscription))), /套餐剩余额度/)
   const unlimited = parseSub2ApiUsage({ ...subscription, remaining: -1 })
   assert.deepEqual(unlimited.balances, [])

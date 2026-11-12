@@ -8,6 +8,7 @@ export const defaults = Object.freeze({
   bubbleMode: 'always', bubbleStates: ['SUCCESS', 'ERROR', 'WAITING'],
   includeSubagents: false, balanceEnabled: true, openUrl: '',
   balanceType: 'auto', balanceProvider: '',
+  petEngine: 'dsh-pet', petId: 'main',
 })
 
 export function settingsPaths(directory, env = process.env, home = homedir()) {
@@ -31,11 +32,13 @@ export function normalizeSettings(input = {}) {
     ['activityLevel', ['quiet', 'normal', 'lively']],
     ['bubbleMode', ['always', 'hidden', 'custom']],
     ['balanceType', ['auto', 'deepseek', 'sub2api']],
+    ['petEngine', ['dsh-pet', 'native']],
   ]) {
     if (choices.includes(input[key])) value[key] = input[key]
   }
   if (input.balanceType === 'subapi2') value.balanceType = 'sub2api'
   if (typeof input.balanceProvider === 'string') value.balanceProvider = input.balanceProvider.trim()
+  if (typeof input.petId === 'string' && input.petId.trim()) value.petId = input.petId.trim()
   for (const [key, choices] of [
     ['soundStates', ['SUCCESS', 'ERROR', 'APPROVAL']],
     ['bubbleStates', ['IDLE', 'THINKING', 'WORKING', 'WAITING', 'SUCCESS', 'ERROR']],

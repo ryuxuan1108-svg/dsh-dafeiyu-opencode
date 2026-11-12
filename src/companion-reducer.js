@@ -309,6 +309,20 @@ export class CompanionReducer {
     return this.#render()
   }
 
+  // Restore a connected workspace after the shared Helper owner changes.
+  // Render durable state without replaying completion sounds or approvals.
+  restoreSession(sessionId, snapshot) {
+    if (!Object.values(CompanionState).includes(snapshot.state)) return []
+    const record = this.#record(sessionId)
+    for (const field of ['state', 'turnActive', 'waitingCallId', 'waitingApprovalId', 'task', 'progress', 'project', 'reasoningEffort', 'subagent']) {
+      record[field] = snapshot[field]
+    }
+    record.payload = { ...snapshot.payload }
+    record.openTools = new Map(snapshot.openTools ?? [])
+    record.updatedAt = ++this.clock
+    return this.#render()
+  }
+
   #toolResult(record, event) {
     const callId = toolCallIdOf(event)
     if (callId) record.openTools.delete(callId)

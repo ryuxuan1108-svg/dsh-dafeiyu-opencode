@@ -1,7 +1,7 @@
 {
   "name": "dsh-dafeiyu",
   "version": "0.1.23",
-  "description": "A native BigFish desktop companion for OpenCode, ported from DeepSeek Harness.",
+  "description": "PC2005-cloud/dsh-pet desktop engine integrated with OpenCode, shared workspaces and Sub2API balances.",
   "author": "QCYTSN",
   "type": "module",
   "main": "src/opencode.js",
@@ -15,6 +15,8 @@
     "./package.json": "./package.json"
   },
   "files": [
+    "dist/",
+    "vendor/dsh-pet-LICENSE.txt",
     "src/",
     "lib/client.js",
     "runtime/helper.py",
@@ -24,10 +26,12 @@
     "runtime/pet_geometry.py",
     "runtime/__init__.py",
     "runtime/bin/",
+    "runtime/dsh-pet/",
     "native/macos/",
     "scripts/build-helper.ps1",
     "scripts/build-helper.sh",
     "scripts/build-helper.mjs",
+    "scripts/build-dsh-pet.mjs",
     "scripts/run-python.mjs",
     "scripts/generate_notification_sounds.py",
     "scripts/test-packaged-helper.mjs",
@@ -57,6 +61,12 @@
     "node": ">=22.19"
   },
   "dependencies": {
+    "@andresaya/edge-tts": "1.9.1",
+    "@electron/get": "5.1.0",
+    "@electron-internal/extract-zip": "1.0.8",
+    "dsh-pet": "0.4.7",
+    "image-size": "2.1.0",
+    "zod": "4.6.7",
     "@deepseek-ai/cosmokit": "1.8.5",
     "@deepseek-ai/schemastery": "3.18.4",
     "@standard-schema/spec": "1.1.0"
@@ -67,10 +77,14 @@
     "@standard-schema/spec"
   ],
   "scripts": {
+    "build:pet": "node scripts/build-dsh-pet.mjs",
+    "prepack": "npm run build:pet",
+    "pretest": "npm run build:pet",
     "test": "node --test --test-timeout=10000 test/*.test.js",
     "test:helper": "node --test test/helper-lifecycle.test.js",
     "test:python": "node scripts/run-python.mjs -m unittest discover -s runtime/tests -t .",
     "test:opencode": "node scripts/test-opencode.mjs",
+    "test:pet": "node scripts/test-dsh-pet-opencode.mjs",
     "helper:headless": "node scripts/run-python.mjs runtime/helper.py --headless",
     "helper:visual": "node scripts/run-python.mjs runtime/helper.py",
     "build:helper": "node scripts/build-helper.mjs",
@@ -78,6 +92,9 @@
     "build:helper:linux": "bash scripts/build-helper.sh",
     "build:helper:darwin": "bash native/macos/build.sh",
     "test:helper:packaged": "node scripts/test-packaged-helper.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
   },
   "dsh": {
     "client": {
